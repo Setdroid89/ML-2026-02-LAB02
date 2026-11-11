@@ -5,13 +5,12 @@ from __future__ import annotations
 import numpy as np
 
 from src.embeddings.base import ExtractorEmbedding
-from src.excepciones import EtapaPendienteAlumno
+from src.embeddings.lda import ExtractorLDA
+from src.embeddings.pca import ExtractorPCA
 
 
 class ExtractorFisherfaces(ExtractorEmbedding):
     """Proyección z = W_LDAᵀ W_PCAᵀ (x − μ), ajustada solo con TRAIN.
-
-    TODO(alumno): implementar ``fit`` y ``transform``.
 
     Orden obligatorio:
 
@@ -41,18 +40,20 @@ class ExtractorFisherfaces(ExtractorEmbedding):
         return self.d_lda
 
     def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> ExtractorFisherfaces:
-        del X, y
-        raise self._pendiente()
+        if y is None:
+            raise ValueError("Fisherfaces necesita y_train: LDA usa las identidades.")
+        maximo = int(np.unique(y).size) - 1
+        if self.d_lda > min(maximo, self.d_pca):
+            raise ValueError(
+                f"d_lda={self.d_lda} supera min(C-1={maximo}, d_pca={self.d_pca}). "
+                "Reduzca d_lda."
+            )
+        # Ambos pasos ven solo TRAIN: PCA estima μ y W_PCA; LDA aprende sobre Z_pca.
+        self._pca = ExtractorPCA(n_components=self.d_pca).fit(X)
+        self._lda = ExtractorLDA(n_components=self.d_lda).fit(self._pca.transform(X), y)
+        return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
-        del X
-        raise self._pendiente()
-
-    def _pendiente(self) -> EtapaPendienteAlumno:
-        return EtapaPendienteAlumno(
-            "embeddings.fisherfaces.ExtractorFisherfaces",
-            "Ajuste PCA(d_pca) solo con X_train. Ajuste LDA(d_lda) sobre el PCA "
-            "de TRAIN usando y_train. Pase TEST por las dos transformaciones, "
-            f"sin reajustar. Aquí d_pca={self.d_pca} y d_lda={self.d_lda}; "
-            "compruebe d_lda <= min(C-1, d_pca).",
-        )
+        if not hasattr(self, "_lda"):
+            raise RuntimeError("Fisherfaces: llame a fit antes de transform.")
+        return self.comprobar(self._lda.transform(self._pca.transform(X)), X.shape[0])
