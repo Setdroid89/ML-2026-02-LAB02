@@ -16,6 +16,8 @@ RAIZ = Path(__file__).resolve().parent.parent
 load_dotenv(RAIZ / ".env")
 
 DATA_DIR = RAIZ / "data"
+# Subconjunto LFW ya filtrado (versionado en Git) para no descargar ~200 MB en frío.
+RUTA_LFW_NPZ = RAIZ / "datos_app" / "lfw_50.npz"
 DIR_RESULTADOS = DATA_DIR / "resultados"
 DIR_MODELOS = DATA_DIR / "modelos"
 DIR_FIGURAS = RAIZ / "figuras"

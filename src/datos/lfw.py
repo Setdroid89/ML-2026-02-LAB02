@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 from sklearn.datasets import fetch_lfw_people
 
-from src.config import DIR_CACHE
+from src.config import DIR_CACHE, RUTA_LFW_NPZ
 from src.datos.base import CargadorRostros, validar_conjunto
 from src.modelos import ConjuntoRostros
 
@@ -20,6 +20,19 @@ class CargadorLFW(CargadorRostros):
     nombre = "lfw"
 
     def cargar(self) -> ConjuntoRostros:
+        """Lee ``datos_app/lfw_50.npz`` si existe; si no, descarga con sklearn."""
+        if RUTA_LFW_NPZ.exists():
+            return self._desde_npz(RUTA_LFW_NPZ)
+        return self.cargar_desde_sklearn()
+
+    def _desde_npz(self, ruta) -> ConjuntoRostros:
+        with np.load(ruta, allow_pickle=False) as archivo:
+            images = archivo["images"]
+            y = archivo["y"].astype(int)
+            nombres = [str(n) for n in archivo["nombres"]]
+        return self._armar(images, y, nombres)
+
+    def cargar_desde_sklearn(self) -> ConjuntoRostros:
         lfw = fetch_lfw_people(
             min_faces_per_person=MIN_FOTOS_POR_PERSONA,
             resize=ESCALA,
@@ -39,6 +52,9 @@ class CargadorLFW(CargadorRostros):
         y = np.searchsorted(ids_elegidos, y_original[mascara]).astype(int)
         nombres = [str(lfw.target_names[i]) for i in ids_elegidos]
 
+        return self._armar(images, y, nombres)
+
+    def _armar(self, images: np.ndarray, y: np.ndarray, nombres: list[str]) -> ConjuntoRostros:
         n, alto, ancho = images.shape
         conjunto = ConjuntoRostros(
             nombre=self.nombre,
