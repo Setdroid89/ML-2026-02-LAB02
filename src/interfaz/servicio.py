@@ -8,17 +8,23 @@ import numpy as np
 from src.clasificadores.fabrica import FabricaClasificadores
 from src.config import DIMENSIONES, RANDOM_STATE, TEST_SIZE, asegurar_directorios, ruta_modelo
 from src.datos.division import DivisorEstratificado
+from src.datos.lfw import CargadorLFW
 from src.datos.olivetti import CargadorOlivetti
 from src.embeddings.fabrica import FabricaExtractores
 from src.modelos import ConjuntoRostros, Particion, Prediccion
 
 
+CARGADORES = {"olivetti": CargadorOlivetti, "lfw": CargadorLFW}
+
+
 class ServicioReconocimiento:
     """Usa el mismo split y los mismos artefactos que ``main.py``."""
 
-    def __init__(self) -> None:
+    def __init__(self, dataset: str = "olivetti") -> None:
+        if dataset not in CARGADORES:
+            raise ValueError(f"Dataset desconocido: {dataset}")
         asegurar_directorios()
-        self.conjunto: ConjuntoRostros = CargadorOlivetti().cargar()
+        self.conjunto: ConjuntoRostros = CARGADORES[dataset]().cargar()
         self.particion: Particion = DivisorEstratificado().dividir(self.conjunto)
         self.fabrica_extractores = FabricaExtractores()
         self.fabrica_clasificadores = FabricaClasificadores()
@@ -41,11 +47,6 @@ class ServicioReconocimiento:
 
     def predecir(self, indice: int, embedding: str, clasificador: str, d: int) -> Prediccion:
         self._exigir_indice(indice)
-        if embedding == "fisherfaces":
-            raise ValueError(
-                "Fisherfaces es TODO(alumno) en src/embeddings/fisherfaces.py "
-                "y no está disponible en la interfaz."
-            )
         bundle = self._obtener_bundle(embedding, clasificador, d)
         x = self.particion.X_test[indice : indice + 1]
         Z = bundle["extractor"].transform(x)

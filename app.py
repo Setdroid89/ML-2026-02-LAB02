@@ -23,23 +23,36 @@ from src.interfaz.servicio import ServicioReconocimiento
 st.set_page_config(page_title="Embeddings faciales", layout="wide")
 
 
-@st.cache_resource
-def obtener_servicio() -> ServicioReconocimiento:
-    return ServicioReconocimiento()
+@st.cache_resource(show_spinner="Cargando datos y separando TRAIN/TEST...")
+def obtener_servicio(dataset: str) -> ServicioReconocimiento:
+    """Un servicio por dataset: datos, split y modelos ajustados se reutilizan."""
+    return ServicioReconocimiento(dataset)
+
+
+@st.cache_data
+def obtener_etiquetas(dataset: str) -> list[str]:
+    return obtener_servicio(dataset).etiquetas_prueba()
 
 
 def main() -> None:
-    servicio = obtener_servicio()
+    with st.sidebar:
+        st.header("Datos")
+        dataset = st.radio("Conjunto", options=["olivetti", "lfw"], format_func=_etiqueta_dataset)
+    servicio = obtener_servicio(dataset)
     st.title("Reconocimiento de rostros con embeddings lineales")
     st.caption(
-        "Cada fotografía pertenece al conjunto de prueba de Olivetti "
+        f"Cada fotografía pertenece al conjunto de prueba de {_etiqueta_dataset(dataset)} "
         f"({servicio.particion.images_test.shape[0]} imágenes). "
-        "No participó del ajuste de PCA, LDA ni del clasificador."
+        "No participó del ajuste de PCA, LDA, Fisherfaces ni del clasificador."
     )
 
     with st.sidebar:
         st.header("Modelo")
-        embedding = st.radio("Representación", options=["pca", "lda"], format_func=_etiqueta_embedding)
+        embedding = st.radio(
+            "Representación",
+            options=["pca", "lda", "fisherfaces"],
+            format_func=_etiqueta_embedding,
+        )
         clasificador = st.radio(
             "Clasificador",
             options=["svm", "knn", "arbol"],
@@ -47,10 +60,10 @@ def main() -> None:
         )
         d = st.select_slider("Componentes (d)", options=list(DIMENSIONES))
         st.info(
-            "Fisherfaces queda como TODO(alumno) en src/embeddings/fisherfaces.py. "
-            "La interfaz usa solo PCA y LDA, que ya están ajustados en TRAIN."
+            "PCA, LDA y Fisherfaces se ajustan solo con TRAIN; "
+            "la foto de prueba solo se proyecta."
         )
-        etiquetas = servicio.etiquetas_prueba()
+        etiquetas = obtener_etiquetas(dataset)
         indice = st.selectbox(
             "Fotografía de prueba",
             options=range(len(etiquetas)),
@@ -90,7 +103,11 @@ def main() -> None:
 
 
 def _etiqueta_embedding(nombre: str) -> str:
-    return {"pca": "PCA", "lda": "LDA"}[nombre]
+    return {"pca": "PCA", "lda": "LDA", "fisherfaces": "Fisherfaces"}[nombre]
+
+
+def _etiqueta_dataset(nombre: str) -> str:
+    return {"olivetti": "Olivetti", "lfw": "LFW (50 identidades)"}[nombre]
 
 
 def _etiqueta_clasificador(nombre: str) -> str:
